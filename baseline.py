@@ -1,8 +1,9 @@
 import os
-import pandas as pd
-import numpy as np
-import networkx as nx
+
 import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 
@@ -20,20 +21,25 @@ citations = pd.read_csv(
     os.path.join(data_dir, "cora.cites"),
     sep="\t",
     header=None,
-    names=["target", "source"]
+    names=["target", "source"],
 )
 
 # print(citations.head(n=100))
 
 # Papers Data
-column_names = ["paper_id"] + [f"term_{idx}" for idx in range(1433)] + ["subject"]
+column_names = (
+    ["paper_id"] + [f"term_{idx}" for idx in range(1433)] + ["subject"]
+)
 papers = pd.read_csv(
-    os.path.join(data_dir, "cora.content"), sep="\t", header=None, names=column_names
+    os.path.join(data_dir, "cora.content"),
+    sep="\t",
+    header=None,
+    names=column_names,
 )
 # print(citations.head(n=100))
 # print(papers.sample(5).T)
 
-# Create zero-based id value for the data 
+# Create zero-based id value for the data
 class_values = sorted(papers["subject"].unique())
 paper_values = sorted(papers["paper_id"].unique())
 class_idx = {name: idx for idx, name in enumerate(class_values)}
@@ -52,7 +58,9 @@ papers["subject"] = papers["subject"].apply(lambda value: class_idx[value])
 # print(citations.sample(n=1500))
 plt.figure(figsize=(10, 10))
 cora_graph = nx.from_pandas_edgelist(citations.sample(n=1500))
-subjects = list(papers[papers["paper_id"].isin(list(cora_graph.nodes))]["subject"])
+subjects = list(
+    papers[papers["paper_id"].isin(list(cora_graph.nodes))]["subject"]
+)
 nx.draw_spring(cora_graph, node_size=15, node_color=subjects)
 
 # plt.savefig("graph_data.png")
@@ -75,11 +83,12 @@ dropout_rate = 0.5
 num_epochs = 300
 batch_size = 256
 
+
 def run_experiment(model, x_train, y_train):
     model.compile(
-        optimizer = keras.optimizers.Adam(learning_rate),
-        loss = keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics = [keras.metrics.SparseCategoricalAccuracy(name="acc")]
+        optimizer=keras.optimizers.Adam(learning_rate),
+        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        metrics=[keras.metrics.SparseCategoricalAccuracy(name="acc")],
     )
     early_stopping = keras.callbacks.EarlyStopping(
         monitor="val_acc", patience=50, restore_best_weights=True
@@ -93,6 +102,7 @@ def run_experiment(model, x_train, y_train):
         callbacks=[early_stopping],
     )
     return history
+
 
 def display_learning_curves(history):
     _, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
@@ -116,8 +126,9 @@ def create_ffn(hidden_units, dropout_rate, name=None):
         ffn_layers.append(keras.layers.BatchNormalization())
         ffn_layers.append(keras.layers.Dropout(dropout_rate))
         ffn_layers.append(keras.layers.Dense(units, activation=tf.nn.gelu))
-    
-    return keras.Sequential(ffn_layers,name=name)
+
+    return keras.Sequential(ffn_layers, name=name)
+
 
 feature_names = list(set(papers.columns) - {"paper_id", "subject"})
 num_features = len(feature_names)
@@ -130,20 +141,22 @@ x_test = test_data[feature_names].to_numpy()
 y_train = train_data["subject"]
 y_test = test_data["subject"]
 
+
 def create_baseline_model(hidden_units, num_classes, dropout_rate=0.2):
     inputs = keras.layers.Input(shape=(num_features,))
     x = create_ffn(hidden_units, dropout_rate)(inputs)
     for _ in range(4):
         x1 = create_ffn(hidden_units, dropout_rate)(x)
         x = keras.layers.Add()([x, x1])
-    
+
     logits = keras.layers.Dense(num_classes)(x)
     return keras.models.Model(inputs=inputs, outputs=logits)
+
 
 model = create_baseline_model(hidden_units, num_classes, dropout_rate)
 history = run_experiment(model, x_train, y_train)
 
 display_learning_curves(history)
 
-_, test_accuracy = model.evaluate(x=x_test,y=y_test, verbose=0)
+_, test_accuracy = model.evaluate(x=x_test, y=y_test, verbose=0)
 print(f"Test accuracy: {round(test_accuracy * 100, 2)}%")
